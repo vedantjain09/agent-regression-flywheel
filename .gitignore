@@ -11,3 +11,4 @@ dist/
 build/
 *.egg-info/
 .pytest_cache/
+backend/django_admin/db.sqlite3
