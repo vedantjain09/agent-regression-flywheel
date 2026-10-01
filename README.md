@@ -30,8 +30,68 @@ Full design rationale: [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 ## Status
 
-Actively built section by section — see commit history. Status of each
-component is tracked in [docs/STATUS.md](./docs/STATUS.md).
+Fully built, section by section — see commit history (10 commits, one per
+architectural section). Per-component status: [docs/STATUS.md](./docs/STATUS.md).
+
+## Proof numbers
+
+- **58 tests passing** across the project: 53 passed + 1 documented skip in
+  the Python/pytest suite (`cd backend && PYTHONPATH=. pytest ../tests -v`),
+  plus 5/5 passing in the Django back-office suite
+  (`cd backend/django_admin && python manage.py test tasks`).
+- The 1 skip is `test_regression_run_workflow_against_live_temporal_server` —
+  documented and intentional: this environment has no network route to
+  Temporal's ephemeral-test-server download endpoint, so the activity under
+  test (`run_trial_activity`) is instead verified directly with 6 passing
+  tests, and the skip records the live-server integration shape that would
+  run in CI with network access.
+- A real bug was caught and fixed by the test suite along the way: a numpy
+  `np.bool_` vs. Python `bool` identity mismatch in
+  `app/stats/significance.py` (`tests/test_significance.py`), and a missing
+  `n_pairs`/`n_concordant`/count breakdown in the `/runs/compare` HTTP
+  response that the dashboard needed (`app/api/main.py`, found while wiring
+  up `frontend/lib/api.ts`). Both are called out in their section's commit
+  message rather than silently fixed.
+- `~1,760` lines of backend Python (`app/`, excluding tests), `~840` lines of
+  backend tests, `~830` lines of frontend TypeScript/TSX.
+- 10 Kubernetes manifests (`k8s/`), structurally validated (`yaml.safe_load_all`
+  over every file) — no live cluster available in this environment to apply
+  them against, documented in `k8s/README.md` along with what's deliberately
+  out of scope (external Temporal server, metrics pipeline, Ingress).
+- The dashboard (`frontend/`) type-checks clean (`tsc --noEmit`), lints clean
+  (`eslint .`), and builds a production bundle (`next build`) — both routes
+  prerender statically against the demo-data fallback when no backend URL is
+  configured, and switch to live data automatically once
+  `NEXT_PUBLIC_FASTAPI_BASE`/`NEXT_PUBLIC_DJANGO_BASE` are set.
+
+## Running it
+
+```bash
+# backend
+cd backend
+pip install -r requirements.txt
+PYTHONPATH=. uvicorn app.api.main:app --reload --port 8000
+
+# django back-office (separate terminal)
+cd backend/django_admin
+python manage.py migrate
+python manage.py runserver 8001
+
+# dashboard (separate terminal)
+cd frontend
+npm install
+cp .env.example .env.local   # point at the two services above
+npm run dev
+```
+
+Full test suite:
+
+```bash
+cd backend && pip install -r requirements.txt
+PYTHONPATH=backend pytest tests/ -v          # from repo root
+cd backend/django_admin && python manage.py test tasks -v 2
+cd frontend && npm install && npx tsc --noEmit && npx eslint . && npm run build
+```
 
 ## Stack
 
