@@ -8,6 +8,6 @@
 | Failure mining + environment registry | done (6/6 tests passing) |
 | Temporal workflows + Modal sandbox runner | done (6/6 tests passing, 1 documented skip needing live Temporal server) |
 | Statistical significance module | done (6/6 tests passing) |
-| FastAPI + Django backend | in progress |
-| Next.js dashboard + K8s + observability | pending |
+| FastAPI + Django backend | done (7/7 FastAPI tests passing, 5/5 Django tests passing) |
+| Next.js dashboard + K8s + observability | in progress |
 | Tests + final README numbers | pending |
