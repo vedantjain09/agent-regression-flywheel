@@ -9,5 +9,5 @@
 | Temporal workflows + Modal sandbox runner | done (6/6 tests passing, 1 documented skip needing live Temporal server) |
 | Statistical significance module | done (6/6 tests passing) |
 | FastAPI + Django backend | done (7/7 FastAPI tests passing, 5/5 Django tests passing) |
-| Next.js dashboard + K8s + observability | in progress |
-| Tests + final README numbers | pending |
+| Next.js dashboard + K8s + observability | done (dashboard builds clean, 5 worker tests + 9 observability tests passing, 10 k8s manifests) |
+| Tests + final README numbers | in progress |

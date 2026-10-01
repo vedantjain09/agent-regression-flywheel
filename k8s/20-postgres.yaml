@@ -1,0 +1,63 @@
+# Durable state (TaskRow/TrialRow/RegressionRunRow/FailureClusterRow —
+# backend/app/models/orm.py). StatefulSet + PVC so a pod reschedule
+# doesn't lose data, unlike Redis/DuckDB below which are treated as
+# disposable caches.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: flywheel-postgres
+  namespace: agent-regression-flywheel
+spec:
+  serviceName: flywheel-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flywheel-postgres
+  template:
+    metadata:
+      labels:
+        app: flywheel-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: flywheel-config
+            - secretRef:
+                name: flywheel-secrets
+          env:
+            - name: POSTGRES_USER
+              value: "flywheel"
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 20Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flywheel-postgres
+  namespace: agent-regression-flywheel
+spec:
+  clusterIP: None
+  selector:
+    app: flywheel-postgres
+  ports:
+    - port: 5432

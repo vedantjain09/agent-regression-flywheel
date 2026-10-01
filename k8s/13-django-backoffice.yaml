@@ -1,0 +1,50 @@
+# Django back-office (backend/django_admin): task-approval queue admin UI
+# + DRF API. CRUD-shaped, low-QPS, no need for the aggressive autoscaling
+# the agent runner needs — a fixed small replica count is enough.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: django-backoffice
+  namespace: agent-regression-flywheel
+  labels:
+    app: django-backoffice
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: django-backoffice
+  template:
+    metadata:
+      labels:
+        app: django-backoffice
+    spec:
+      containers:
+        - name: django-backoffice
+          image: agent-regression-flywheel/django-backoffice:latest
+          command: ["gunicorn", "backoffice.wsgi:application", "--bind", "0.0.0.0:8001", "--workers", "3"]
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - configMapRef:
+                name: flywheel-config
+            - secretRef:
+                name: flywheel-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: django-backoffice
+  namespace: agent-regression-flywheel
+spec:
+  selector:
+    app: django-backoffice
+  ports:
+    - port: 80
+      targetPort: 8001

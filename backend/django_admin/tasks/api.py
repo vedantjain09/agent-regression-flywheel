@@ -7,6 +7,8 @@ from rest_framework import serializers, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from app.observability import metrics
+
 from .models import PendingTask
 
 
@@ -36,6 +38,7 @@ class PendingTaskViewSet(viewsets.ModelViewSet):
         task.review_notes = request.data.get("notes", "")
         task.reviewed_at = timezone.now()
         task.save()
+        metrics.track_task_reviewed(reviewer=task.reviewed_by, task_id=str(task.external_id), decision="approved")
         return Response(self.get_serializer(task).data)
 
     @action(detail=True, methods=["post"])
@@ -46,4 +49,5 @@ class PendingTaskViewSet(viewsets.ModelViewSet):
         task.review_notes = request.data.get("notes", "")
         task.reviewed_at = timezone.now()
         task.save()
+        metrics.track_task_reviewed(reviewer=task.reviewed_by, task_id=str(task.external_id), decision="rejected")
         return Response(self.get_serializer(task).data)

@@ -13,6 +13,7 @@ on that interface, not on in-memory dicts specifically).
 """
 from __future__ import annotations
 
+import time
 import uuid
 from typing import Protocol
 
@@ -20,10 +21,16 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from app.agent.graph import run_agent
+from app.observability import metrics
+from app.observability.langsmith_tracing import configure_tracing
 from app.schemas.task import Task, Trial
 from app.stats.significance import PairedOutcome, mcnemar_exact, should_promote
 
 app = FastAPI(title="Agent Regression Flywheel API")
+
+# No-op without LANGCHAIN_API_KEY/LANGSMITH_API_KEY set — see
+# observability/langsmith_tracing.py.
+configure_tracing()
 
 
 # --- repository interfaces (swap for Postgres-backed impls in production) ---
@@ -73,8 +80,12 @@ def agent_run(req: AgentRunRequest) -> AgentRunResponse:
     """The production agent entrypoint — runs the LangGraph agent on a
     live instruction. Every call is traced to LangSmith in production
     (see observability/langsmith_tracing.py); that trace stream is what
-    the mining service in app/mining consumes."""
+    the mining service in app/mining consumes. Duration and outcome are
+    also recorded to Datadog (observability/metrics.py) as an
+    operational metric, independent of the LangSmith trace."""
+    started = time.perf_counter()
     result = run_agent(req.instruction, max_steps=req.max_steps)
+    metrics.record_agent_run(duration_seconds=time.perf_counter() - started, status=result["status"])
     return AgentRunResponse(
         status=result["status"],
         observations=result["observations"],
@@ -105,6 +116,10 @@ class CompareRequest(BaseModel):
 
 
 class CompareResponse(BaseModel):
+    n_pairs: int
+    n_concordant: int
+    baseline_only_passed: int
+    candidate_only_passed: int
     p_value: float
     significant: bool
     direction: str
@@ -131,7 +146,12 @@ def compare_versions(req: CompareRequest) -> CompareResponse:
         raise HTTPException(status_code=400, detail="at least one paired outcome is required")
     result = mcnemar_exact(outcomes)
     promote, reason = should_promote(result)
+    metrics.record_regression_run(n_pairs=result.n_pairs, p_value=result.p_value, promoted=promote)
     return CompareResponse(
+        n_pairs=result.n_pairs,
+        n_concordant=result.n_concordant,
+        baseline_only_passed=result.baseline_only_passed,
+        candidate_only_passed=result.candidate_only_passed,
         p_value=result.p_value,
         significant=result.significant,
         direction=result.direction,

@@ -1,0 +1,61 @@
+# Runs backend/app/workflows/worker.py: the Temporal worker executing
+# RegressionRunWorkflow and run_trial_activity against a Temporal
+# server (not included here — a real cluster points TEMPORAL_ADDRESS at
+# a managed Temporal Cloud namespace or an in-cluster Temporal server
+# deployment). Scales on fan-out trial volume, similar in spirit to the
+# mining service, but keyed on Temporal's own task-queue backlog metric
+# rather than Redis queue depth.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-worker
+  namespace: agent-regression-flywheel
+  labels:
+    app: temporal-worker
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: temporal-worker
+  template:
+    metadata:
+      labels:
+        app: temporal-worker
+    spec:
+      containers:
+        - name: temporal-worker
+          image: agent-regression-flywheel/backend:latest
+          command: ["python", "-m", "app.workflows.worker"]
+          envFrom:
+            - configMapRef:
+                name: flywheel-config
+            - secretRef:
+                name: flywheel-secrets
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: temporal-worker
+  namespace: agent-regression-flywheel
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: temporal-worker
+  minReplicas: 2
+  maxReplicas: 15
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: temporal_task_queue_backlog
+        target:
+          type: AverageValue
+          averageValue: "100"

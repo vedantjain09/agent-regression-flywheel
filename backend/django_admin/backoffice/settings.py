@@ -122,3 +122,12 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Lets this Django project import the shared app.observability package from
+# the FastAPI backend (backend/app/observability/metrics.py) without
+# duplicating the Datadog/PostHog client setup — the two backends share one
+# observability layer by design (see ARCHITECTURE.md "Why FastAPI and
+# Django"), they don't each reinvent it.
+import sys as _sys
+
+_sys.path.insert(0, str(BASE_DIR.parent))

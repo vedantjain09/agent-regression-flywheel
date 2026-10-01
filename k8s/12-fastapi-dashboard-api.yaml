@@ -1,0 +1,60 @@
+# This is a thin re-exposure of the same backend/app/api/main.py image
+# dedicated to dashboard traffic (so dashboard read load and agent-run
+# write load can be scaled, rate-limited, and alerted on independently —
+# the agent runner in 10-agent-runner.yaml serves /agent/run, this serves
+# /tasks, /tasks/{id}, /runs/compare). In a smaller deployment these two
+# could be the same Service pointed at from two different HPAs; kept
+# separate here because their traffic/latency profiles genuinely differ
+# (interactive dashboard reads vs. long-running agent executions).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-api
+  namespace: agent-regression-flywheel
+  labels:
+    app: dashboard-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dashboard-api
+  template:
+    metadata:
+      labels:
+        app: dashboard-api
+    spec:
+      containers:
+        - name: dashboard-api
+          image: agent-regression-flywheel/backend:latest
+          command: ["uvicorn", "app.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: flywheel-config
+            - secretRef:
+                name: flywheel-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-api
+  namespace: agent-regression-flywheel
+spec:
+  selector:
+    app: dashboard-api
+  ports:
+    - port: 80
+      targetPort: 8000

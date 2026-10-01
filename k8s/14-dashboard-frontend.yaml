@@ -1,0 +1,56 @@
+# The Next.js dashboard (frontend/). Stateless, served as a production
+# `next start` build. Points at dashboard-api and django-backoffice over
+# the in-cluster Service DNS names.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard-frontend
+  namespace: agent-regression-flywheel
+  labels:
+    app: dashboard-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dashboard-frontend
+  template:
+    metadata:
+      labels:
+        app: dashboard-frontend
+    spec:
+      containers:
+        - name: dashboard-frontend
+          image: agent-regression-flywheel/frontend:latest
+          command: ["npm", "run", "start"]
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_FASTAPI_BASE
+              value: "http://dashboard-api.agent-regression-flywheel.svc.cluster.local"
+            - name: NEXT_PUBLIC_DJANGO_BASE
+              value: "http://django-backoffice.agent-regression-flywheel.svc.cluster.local"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-frontend
+  namespace: agent-regression-flywheel
+spec:
+  selector:
+    app: dashboard-frontend
+  ports:
+    - port: 80
+      targetPort: 3000
+  type: ClusterIP

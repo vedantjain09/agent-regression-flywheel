@@ -1,0 +1,65 @@
+# The failure-mining service: drains backend/app/models/queue.py's
+# RedisQueue of incoming trace summaries in batches, runs
+# backend/app/mining/cluster.py (TF-IDF embedding + HDBSCAN) and
+# backend/app/registry/environment_registry.py's promote_clusters on each
+# batch. Bursty and batch-driven, not request-driven, so it scales on
+# Redis queue depth rather than request rate or even CPU alone — a queue
+# backing up is the actual signal that more mining capacity is needed.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mining-service
+  namespace: agent-regression-flywheel
+  labels:
+    app: mining-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mining-service
+  template:
+    metadata:
+      labels:
+        app: mining-service
+    spec:
+      containers:
+        - name: mining-service
+          image: agent-regression-flywheel/backend:latest
+          command: ["python", "-m", "app.mining.worker"]
+          envFrom:
+            - configMapRef:
+                name: flywheel-config
+            - secretRef:
+                name: flywheel-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+---
+# Scales on Redis trace-queue depth (RedisQueue.queue_depth), exposed as a
+# custom metric. A batch-driven worker idles at near-zero CPU between
+# drains, so CPU-based scaling alone would under-react to a queue that's
+# backing up — queue depth is the leading indicator.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: mining-service
+  namespace: agent-regression-flywheel
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: mining-service
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: External
+      external:
+        metric:
+          name: redis_trace_queue_depth
+        target:
+          type: AverageValue
+          averageValue: "200"
