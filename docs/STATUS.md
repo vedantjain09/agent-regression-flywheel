@@ -7,7 +7,7 @@
 | LangGraph agent + FastMCP tools | done (8/8 tests passing) |
 | Failure mining + environment registry | done (6/6 tests passing) |
 | Temporal workflows + Modal sandbox runner | done (6/6 tests passing, 1 documented skip needing live Temporal server) |
-| Statistical significance module | in progress |
-| FastAPI + Django backend | pending |
+| Statistical significance module | done (6/6 tests passing) |
+| FastAPI + Django backend | in progress |
 | Next.js dashboard + K8s + observability | pending |
 | Tests + final README numbers | pending |
