@@ -33,6 +33,11 @@ class PendingTaskViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         task = self.get_object()
+        if task.status != PendingTask.ReviewStatus.PENDING:
+            return Response(
+                {"error": f"Task already {task.status}"},
+                status=400
+            )
         task.status = PendingTask.ReviewStatus.APPROVED
         task.reviewed_by = request.data.get("reviewed_by", "unknown")
         task.review_notes = request.data.get("notes", "")
@@ -44,6 +49,11 @@ class PendingTaskViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def reject(self, request, pk=None):
         task = self.get_object()
+        if task.status != PendingTask.ReviewStatus.PENDING:
+            return Response(
+                {"error": f"Task already {task.status}"},
+                status=400
+            )
         task.status = PendingTask.ReviewStatus.REJECTED
         task.reviewed_by = request.data.get("reviewed_by", "unknown")
         task.review_notes = request.data.get("notes", "")

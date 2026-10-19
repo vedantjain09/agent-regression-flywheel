@@ -14,15 +14,20 @@ import pathlib
 import subprocess
 from typing import Callable
 
-_SANDBOX_ROOT = pathlib.Path("/tmp/agent_sandbox")
+_SANDBOX_ROOT = pathlib.Path("/tmp/agent_sandbox").resolve()
 _SANDBOX_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 def _resolve(path: str) -> pathlib.Path:
-    resolved = (_SANDBOX_ROOT / path).resolve()
-    if _SANDBOX_ROOT.resolve() not in resolved.parents and resolved != _SANDBOX_ROOT.resolve():
+    # Normalize and resolve relative to sandbox root
+    target = (_SANDBOX_ROOT / path).resolve()
+    sandbox = _SANDBOX_ROOT.resolve()
+    
+    # Check if resolved path is within sandbox using is_relative_to
+    # This handles symlinked paths (e.g., /tmp -> /private/tmp on macOS)
+    if not target.is_relative_to(sandbox):
         raise ValueError(f"path escapes sandbox root: {path}")
-    return resolved
+    return target
 
 
 def read_file(path: str) -> str:
@@ -43,10 +48,22 @@ def list_files(path: str = ".") -> list[str]:
     target = _resolve(path)
     if not target.exists():
         return []
-    return sorted(str(p.relative_to(_SANDBOX_ROOT)) for p in target.rglob("*") if p.is_file())
+    # Handle symlinked paths (e.g., /tmp -> /private/tmp on macOS)
+    # by resolving both to their canonical form before computing relative path
+    sandbox_resolved = _SANDBOX_ROOT.resolve()
+    return sorted(
+        str(p.resolve().relative_to(sandbox_resolved))
+        for p in target.rglob("*")
+        if p.is_file()
+    )
 
 
 def run_shell(command: str, timeout_seconds: int = 30) -> dict:
+    # Sanitize command to prevent shell injection
+    forbidden_chars = [';', '&', '|', '`', '$', '(', ')', '<', '>', '\n', '\r']
+    if any(char in command for char in forbidden_chars):
+        raise ValueError(f"Shell command contains forbidden characters: {command}")
+    
     try:
         result = subprocess.run(
             command, shell=True, cwd=_SANDBOX_ROOT, capture_output=True, text=True, timeout=timeout_seconds

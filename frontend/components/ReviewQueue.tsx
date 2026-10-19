@@ -23,6 +23,7 @@ export default function ReviewQueue({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [currentUser, setCurrentUser] = useState("anonymous");
 
   // Extract unique categories
   const categories = useMemo(() => {
@@ -57,7 +58,7 @@ export default function ReviewQueue({
     setError(null);
     try {
       const fn = decision === "approve" ? approvePendingTask : rejectPendingTask;
-      const updated = await fn(id, "vedant", `${decision}d from the dashboard review queue`);
+      const updated = await fn(id, currentUser, `${decision}d from the dashboard review queue`);
       if (updated) {
         setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)));
       }

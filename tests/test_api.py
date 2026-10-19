@@ -1,5 +1,6 @@
 """Tests for the FastAPI agent + dashboard API."""
 import pathlib
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,7 +27,9 @@ def clean_state():
 def test_health(client):
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "checks" in data
 
 
 def test_agent_run_end_to_end(client):
@@ -65,7 +68,7 @@ def test_compare_versions_promotes_on_significant_improvement(client):
     for i in range(30):
         baseline_passed = i % 3 == 0
         candidate_passed = True if baseline_passed else (i % 4 != 0)
-        pairs.append({"task_id": f"t{i}", "seed": i, "baseline_passed": baseline_passed, "candidate_passed": candidate_passed})
+        pairs.append({"task_id": str(uuid.uuid4()), "seed": i, "baseline_passed": baseline_passed, "candidate_passed": candidate_passed})
     response = client.post(
         "/runs/compare",
         json={"baseline_version": "v1", "candidate_version": "v2", "pairs": pairs},
@@ -85,7 +88,7 @@ def test_compare_versions_rejects_empty_pairs(client):
 
 
 def test_compare_versions_inconclusive_on_tiny_sample(client):
-    pairs = [{"task_id": "t0", "seed": 0, "baseline_passed": True, "candidate_passed": False}]
+    pairs = [{"task_id": "00000000-0000-0000-0000-000000000000", "seed": 0, "baseline_passed": True, "candidate_passed": False}]
     response = client.post(
         "/runs/compare",
         json={"baseline_version": "v1", "candidate_version": "v2", "pairs": pairs},

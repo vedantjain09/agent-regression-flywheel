@@ -90,6 +90,9 @@ if __name__ == "__main__":  # pragma: no cover
         def summaries_for(self, trace_ids: list[str]) -> list[TraceSummary]:
             records = self._store.query_recent(hours=24 * 7, limit=len(trace_ids) * 2)
             by_id = {r.trace_id: r for r in records}
+            missing_ids = set(trace_ids) - set(by_id.keys())
+            if missing_ids:
+                logger.warning(f"Skipping {len(missing_ids)} trace IDs not found in trace store: {missing_ids}")
             return [
                 TraceSummary(trace_id=tid, summary=by_id[tid].summary, agent_version=by_id[tid].agent_version)
                 for tid in trace_ids

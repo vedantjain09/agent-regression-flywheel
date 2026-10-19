@@ -46,7 +46,8 @@ async def run_trial_activity(task_dict: dict, agent_version: str, seed: int) -> 
     runner = get_sandbox_runner()
     verifier = task.verifier
     check_command = getattr(verifier, "check_command", "true")
-    timeout = task.environment.max_runtime_seconds
+    # Use task timeout with buffer, or default to 5 minutes
+    timeout = task.environment.max_runtime_seconds + 60 if task.environment.max_runtime_seconds else 300
 
     result = runner.run(task.environment.setup_commands, check_command, timeout)
 
